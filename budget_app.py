@@ -66,7 +66,6 @@ if 'account_balances' not in st.session_state:
     }
 
 # Replace the load_csv_files function with this new function for file upload
-@lru_cache(maxsize=2)
 def load_uploaded_csv(uploaded_file):
     """Load transactions from a single uploaded CSV file.
     Results are cached to improve performance."""
@@ -160,8 +159,6 @@ def main():
     
     # Add refresh button to reload data
     if st.sidebar.button("🔄 Refresh Data"):
-        # Clear the cache to force reloading of data
-        load_uploaded_csv.cache_clear()
         st.rerun()
         
     # Load data from uploaded file
