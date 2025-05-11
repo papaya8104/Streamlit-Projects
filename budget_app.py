@@ -65,47 +65,34 @@ if 'account_balances' not in st.session_state:
         "Westpac Offset": 220144.00
     }
 
+# Replace the load_csv_files function with this new function for file upload
 @lru_cache(maxsize=2)
-def load_csv_files(folder_path):
-    """Load all CSV files from the specified folder matching the naming pattern.
+def load_uploaded_csv(uploaded_file):
+    """Load transactions from a single uploaded CSV file.
     Results are cached to improve performance."""
-    all_data = []
-    
-    # Get list of CSV files with pattern YYYY-MM
-    csv_files = glob.glob(os.path.join(folder_path, "????-??.csv"))
-    
-    for file in csv_files:
+    if uploaded_file is not None:
         try:
-            # Extract month and year from filename
-            filename = os.path.basename(file)
-            year_month = filename.split('.')[0]  # Gets "2025-05" part
-            
             # Read the CSV file
-            df = pd.read_csv(file)
+            df = pd.read_csv(uploaded_file)
             
             # Check if required columns exist
             required_cols = ['Date', 'Account', 'Category', 'Subcategory', 'Description', 'Amount']
             if not all(col in df.columns for col in required_cols):
-                st.warning(f"File {filename} is missing required columns. Skipping.")
-                continue
+                st.warning(f"Uploaded file is missing required columns. Please check your file.")
+                return pd.DataFrame()
                 
             # Convert Date to datetime - handle Australian date format (DD/MM/YYYY)
             df['Date'] = pd.to_datetime(df['Date'], format="%d/%m/%Y", errors='coerce')
             
             # Add month info for filtering
-            df['Month'] = year_month
+            df['Month'] = df['Date'].dt.strftime('%Y-%m')
             df['MonthName'] = df['Date'].dt.strftime('%b %Y')
             
-            # Append to the list
-            all_data.append(df)
+            return df
             
         except Exception as e:
-            st.error(f"Error loading file {file}: {e}")
-    
-    # Combine all data
-    if all_data:
-        combined_data = pd.concat(all_data, ignore_index=True)
-        return combined_data
+            st.error(f"Error loading uploaded file: {e}")
+            return pd.DataFrame()
     else:
         return pd.DataFrame()
 
@@ -168,18 +155,23 @@ def check_achievements(data, month=None):
 def main():
     st.markdown('<div class="main-header">Personal Budget Dashboard 💰</div>', unsafe_allow_html=True)
     
-    # Sidebar for configuration
-    st.sidebar.title("Configuration")
-    
-    # Input for CSV folder path
-    folder_path = st.sidebar.text_input("CSV Files Folder Path", "C:\\Users\\jetsn\\OneDrive\\Desktop\\Budget")
+    # Replace sidebar folder path input with file uploader
+    uploaded_file = st.sidebar.file_uploader("Upload CSV File", type=['csv'])
     
     # Add refresh button to reload data
     if st.sidebar.button("🔄 Refresh Data"):
         # Clear the cache to force reloading of data
-        load_csv_files.cache_clear()
+        load_uploaded_csv.cache_clear()
         st.rerun()
-
+        
+    # Load data from uploaded file
+    data = load_uploaded_csv(uploaded_file)
+    
+    if data.empty:
+        st.warning("No valid CSV file uploaded. Please upload a CSV file containing your transactions.")
+        st.info("CSV file should contain columns: Date, Account, Category, Subcategory, Description, and Amount")
+        return
+    
     st.sidebar.markdown("---")
     st.sidebar.markdown("### Recent Activity Settings")
     end_date = st.sidebar.date_input(
@@ -187,14 +179,6 @@ def main():
         value=datetime.now().date(),
         key="recent_activity_end_date"
     )
-    
-    # Load data
-    data = load_csv_files(folder_path)
-    
-    if data.empty:
-        st.warning(f"No valid CSV files found in {folder_path}. Please check the path and file format.")
-        st.info("CSV files should be named like '2025-05.csv' and contain columns: Date, Account, Category, Subcategory, Description, and Amount")
-        return
     
     # Create tabs
     tab1, tab2, tab3, tab4, tab5 = st.tabs(["Dashboard", "Transactions", "Achievements", "Accounts", "Recent Activity"])
