@@ -178,7 +178,7 @@ def main():
     if st.sidebar.button("🔄 Refresh Data"):
         # Clear the cache to force reloading of data
         load_csv_files.cache_clear()
-        st.experimental_rerun()
+        st.rerun()
 
     st.sidebar.markdown("---")
     st.sidebar.markdown("### Recent Activity Settings")
